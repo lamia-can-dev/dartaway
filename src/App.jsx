@@ -1,9 +1,95 @@
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import { ComposableMap, Geographies, Geography } from 'react-simple-maps'
 import { motion, AnimatePresence } from 'framer-motion'
 import { geoNaturalEarth1 } from 'd3-geo'
 import { getRandomCountry } from './data/countries'
+import { getCountryExtras } from './data/countryExtras'
 import './App.css'
+
+function getFlagEmoji(code) {
+  return code
+    .toUpperCase()
+    .split('')
+    .map((c) => String.fromCodePoint(0x1f1e6 + c.charCodeAt(0) - 65))
+    .join('')
+}
+
+function getWeatherEmoji(code) {
+  if (code === 0) return '☀️'
+  if (code <= 3) return '⛅'
+  if (code <= 48) return '🌫️'
+  if (code <= 67) return '🌧️'
+  if (code <= 77) return '❄️'
+  if (code <= 82) return '🌦️'
+  if (code >= 95) return '⛈️'
+  return '🌡️'
+}
+
+function WeatherCard({ lat, lng }) {
+  const [weather, setWeather] = useState(null)
+  const [error, setError] = useState(false)
+
+  useEffect(() => {
+    setWeather(null)
+    setError(false)
+
+    fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current_weather=true`)
+      .then((res) => {
+        if (!res.ok) throw new Error('fetch failed')
+        return res.json()
+      })
+      .then((data) => {
+        setWeather(data.current_weather)
+      })
+      .catch(() => {
+        setError(true)
+      })
+  }, [lat, lng])
+
+  if (error) {
+    return (
+      <div className="info-card">
+        <h3>Weather</h3>
+        <p className="card-error">Could not load weather</p>
+      </div>
+    )
+  }
+
+  if (!weather) {
+    return (
+      <div className="info-card">
+        <h3>Weather</h3>
+        <div className="spinner" />
+      </div>
+    )
+  }
+
+  return (
+    <div className="info-card">
+      <h3>Weather</h3>
+      <span className="weather-icon">{getWeatherEmoji(weather.weathercode)}</span>
+      <p className="weather-temp">{Math.round(weather.temperature)}°C</p>
+      <p className="weather-wind">💨 {weather.windspeed} km/h</p>
+    </div>
+  )
+}
+
+function ExtrasCards({ countryName }) {
+  const extras = getCountryExtras(countryName)
+
+  return (
+    <>
+      <div className="info-card">
+        <h3>Fun Fact</h3>
+        <p className="card-text">{extras.funFact}</p>
+      </div>
+      <div className="info-card">
+        <h3>Day Off Message</h3>
+        <p className="card-text">{extras.dayOffMessage}</p>
+      </div>
+    </>
+  )
+}
 
 const GEO_URL = 'https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json'
 const MAP_WIDTH = 900
@@ -41,6 +127,12 @@ function App() {
       svgX: svgPoint[0],
       svgY: svgPoint[1],
     }
+  }, [])
+
+  const handleClose = useCallback(() => {
+    setSelectedCountry(null)
+    setDartPosition(null)
+    setZoomStyle({ transform: 'scale(1)', transformOrigin: '50% 50%', transition: 'transform 0.5s ease-out' })
   }, [])
 
   const handleThrowDart = useCallback(() => {
@@ -135,6 +227,31 @@ function App() {
             style={{ position: 'fixed', left: 0, top: 0 }}
           >
             🎯
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {selectedCountry && !isFlying && (
+          <motion.div
+            className="info-panel"
+            initial={{ y: '100%' }}
+            animate={{ y: 0 }}
+            exit={{ y: '100%' }}
+            transition={{ duration: 0.4, ease: 'easeOut' }}
+          >
+            <button className="close-btn" onClick={handleClose}>✕</button>
+            <div className="info-header">
+              <span className="flag">{getFlagEmoji(selectedCountry.code)}</span>
+              <div>
+                <h2 className="country-name">{selectedCountry.name}</h2>
+                <p className="capital">📍 {selectedCountry.capital}</p>
+              </div>
+            </div>
+            <div className="info-cards">
+              <WeatherCard lat={selectedCountry.lat} lng={selectedCountry.lng} />
+              <ExtrasCards countryName={selectedCountry.name} />
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
