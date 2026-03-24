@@ -1,0 +1,67 @@
+.app {
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background: #0f0f1a;
+  display: flex;
+  flex-direction: column;
+  padding: 24px 32px;
+}
+
+.title {
+  color: #ffffff;
+  font-size: 32px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  margin: 0;
+  text-shadow: 0 0 20px rgba(244, 132, 95, 0.3);
+}
+
+.title .accent {
+  color: #f4845f;
+}
+
+.map-container {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.throw-btn {
+  align-self: center;
+  position: relative;
+  z-index: 20;
+  padding: 14px 40px;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: #ffffff;
+  background: #f4845f;
+  border: none;
+  border-radius: 50px;
+  cursor: pointer;
+  margin-bottom: 8px;
+  transition: background 0.2s, transform 0.1s;
+}
+
+.throw-btn:hover:not(:disabled) {
+  background: #e06b47;
+  transform: scale(1.05);
+}
+
+.throw-btn:disabled {
+  background: #555;
+  cursor: not-allowed;
+}
+
+.dart {
+  font-size: 36px;
+  pointer-events: none;
+  z-index: 100;
+  transform: translate(-50%, -50%);
+}
