@@ -2,6 +2,7 @@ import { useState, useRef, useCallback, useEffect } from 'react'
 import { ComposableMap, Geographies, Geography } from 'react-simple-maps'
 import { motion, AnimatePresence } from 'framer-motion'
 import { geoNaturalEarth1 } from 'd3-geo'
+import confetti from 'canvas-confetti'
 import { getRandomCountry } from './data/countries'
 import { getCountryExtras } from './data/countryExtras'
 import './App.css'
@@ -23,6 +24,38 @@ function getWeatherEmoji(code) {
   if (code <= 82) return '🌦️'
   if (code >= 95) return '⛈️'
   return '🌡️'
+}
+
+function Starfield() {
+  const stars = useRef(
+    Array.from({ length: 80 }, (_, i) => ({
+      id: i,
+      x: Math.random() * 100,
+      y: Math.random() * 100,
+      size: Math.random() * 2 + 0.5,
+      duration: Math.random() * 3 + 2,
+      delay: Math.random() * 3,
+    }))
+  ).current
+
+  return (
+    <div className="starfield">
+      {stars.map((star) => (
+        <div
+          key={star.id}
+          className="star"
+          style={{
+            left: `${star.x}%`,
+            top: `${star.y}%`,
+            width: `${star.size}px`,
+            height: `${star.size}px`,
+            animationDuration: `${star.duration}s`,
+            animationDelay: `${star.delay}s`,
+          }}
+        />
+      ))}
+    </div>
+  )
 }
 
 function WeatherCard({ lat, lng }) {
@@ -103,11 +136,27 @@ const projection = geoNaturalEarth1()
   .translate([MAP_WIDTH / 2, MAP_HEIGHT / 2])
   .center(MAP_CENTER)
 
+function fireConfetti(x, y) {
+  confetti({
+    particleCount: 80,
+    spread: 60,
+    origin: {
+      x: x / window.innerWidth,
+      y: y / window.innerHeight,
+    },
+    colors: ['#e63946', '#f4845f', '#ffd166', '#06d6a0', '#118ab2'],
+    gravity: 0.8,
+    scalar: 0.9,
+  })
+}
+
 function App() {
   const [selectedCountry, setSelectedCountry] = useState(null)
+  const [previousCountries, setPreviousCountries] = useState([])
   const [isFlying, setIsFlying] = useState(false)
   const [dartPosition, setDartPosition] = useState(null)
   const [zoomStyle, setZoomStyle] = useState({ transform: 'scale(1)', transformOrigin: '50% 50%' })
+  const [throwCount, setThrowCount] = useState(0)
   const mapRef = useRef(null)
 
   const getPixelCoords = useCallback((lat, lng) => {
@@ -136,7 +185,16 @@ function App() {
   }, [])
 
   const handleThrowDart = useCallback(() => {
-    // Reset zoom first
+    // Save current country to history before throwing again
+    if (selectedCountry) {
+      setPreviousCountries((prev) => {
+        if (prev.includes(selectedCountry.id)) return prev
+        return [...prev, selectedCountry.id]
+      })
+    }
+
+    // Close panel and reset zoom first
+    setSelectedCountry(null)
     setZoomStyle({ transform: 'scale(1)', transformOrigin: '50% 50%', transition: 'transform 0.3s ease-out' })
 
     setTimeout(() => {
@@ -146,11 +204,13 @@ function App() {
 
       setIsFlying(true)
       setDartPosition(target)
-      setSelectedCountry(country)
+      setThrowCount((c) => c + 1)
 
-      // After dart lands, zoom in
+      // After dart lands, zoom in + confetti + show panel
       setTimeout(() => {
         setIsFlying(false)
+        setSelectedCountry(country)
+        fireConfetti(target.x, target.y)
         const originX = (target.svgX / MAP_WIDTH) * 100
         const originY = (target.svgY / MAP_HEIGHT) * 100
         setZoomStyle({
@@ -159,12 +219,18 @@ function App() {
           transition: 'transform 1s ease-in-out',
         })
       }, 1200)
-    }, 300)
-  }, [getPixelCoords])
+    }, selectedCountry ? 400 : 100)
+  }, [getPixelCoords, selectedCountry])
 
   return (
     <div className="app">
-      <h1 className="title"><span>Dart</span><span className="accent">Away</span> 🎯</h1>
+      <Starfield />
+      <div className="top-bar">
+        <h1 className="title"><span>Dart</span><span className="accent">Away</span> 🎯</h1>
+        {throwCount > 0 && (
+          <span className="throw-count">{throwCount} throw{throwCount !== 1 ? 's' : ''}</span>
+        )}
+      </div>
       <div className="map-container" ref={mapRef}>
         <ComposableMap
           projection="geoNaturalEarth1"
@@ -177,19 +243,24 @@ function App() {
             {({ geographies }) =>
               geographies.map((geo) => {
                 const isSelected = selectedCountry && geo.id === selectedCountry.id
+                const isPrevious = previousCountries.includes(geo.id)
+                let fillColor = '#1e2140'
+                if (isSelected) fillColor = '#e63946'
+                else if (isPrevious) fillColor = '#7a1a1f'
+
                 return (
                   <Geography
                     key={geo.rsmKey}
                     geography={geo}
                     style={{
                       default: {
-                        fill: isSelected ? '#e63946' : '#1e2140',
+                        fill: fillColor,
                         stroke: '#4a5080',
                         strokeWidth: 0.75,
                         outline: 'none',
                       },
                       hover: {
-                        fill: isSelected ? '#e63946' : '#2e3460',
+                        fill: isSelected ? '#e63946' : isPrevious ? '#8a2a2f' : '#2e3460',
                         stroke: '#4a5080',
                         strokeWidth: 0.75,
                         outline: 'none',
@@ -256,13 +327,15 @@ function App() {
         )}
       </AnimatePresence>
 
-      <button
+      <motion.button
         className="throw-btn"
         onClick={handleThrowDart}
         disabled={isFlying}
+        whileHover={!isFlying ? { scale: 1.08 } : {}}
+        whileTap={!isFlying ? { scale: 0.95 } : {}}
       >
         {isFlying ? 'Flying...' : 'Throw Dart'}
-      </button>
+      </motion.button>
     </div>
   )
 }
